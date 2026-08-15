@@ -494,12 +494,11 @@
         let activeSourceNames = ['sample_ventas_finanzas.xlsx'];
         let CATALOG = {};
 
-        // CLASIFICACIÓN DINÁMICA DE COLUMNAS DE CUALQUIER PLANILLA SUBIDA
+        // MUESTREO ROBUSTO Y CLASIFICACIÓN DE COLUMNAS
         function classifyColumns(dataset) {
             if (!dataset || !dataset.length) return { numeric: [], date: [], geo: [], cat: [] };
             
-            const firstRow = dataset[0];
-            const keys = Object.keys(firstRow);
+            const keys = Object.keys(dataset[0]);
 
             let numeric = [];
             let date = [];
@@ -508,13 +507,30 @@
 
             keys.forEach(key => {
                 const kLower = String(key).toLowerCase();
-                const sampleVal = firstRow[key];
+                
+                // Muestrear hasta 20 filas para detectar el tipo de dato real
+                let isNumCount = 0;
+                let sampleCount = Math.min(dataset.length, 20);
 
-                if (kLower.includes('pais') || kLower.includes('país') || kLower.includes('country') || kLower.includes('region') || kLower.includes('región') || kLower.includes('ciudad') || kLower.includes('city') || kLower.includes('state') || kLower.includes('estado') || kLower.includes('zona')) {
+                for (let r = 0; r < sampleCount; r++) {
+                    let val = dataset[r][key];
+                    if (val !== undefined && val !== null && val !== '') {
+                        if (typeof val === 'number') {
+                            isNumCount++;
+                        } else {
+                            let strClean = String(val).replace(/[$€£\s]/g, '').replace(',', '.');
+                            if (!isNaN(parseFloat(strClean)) && isFinite(strClean)) {
+                                isNumCount++;
+                            }
+                        }
+                    }
+                }
+
+                if (kLower.includes('pais') || kLower.includes('país') || kLower.includes('country') || kLower.includes('region') || kLower.includes('región') || kLower.includes('ciudad') || kLower.includes('city') || kLower.includes('state') || kLower.includes('estado') || kLower.includes('zona') || kLower.includes('comuna')) {
                     geo.push(key);
-                } else if (kLower.includes('fecha') || kLower.includes('date') || kLower.includes('ano') || kLower.includes('año') || kLower.includes('mes') || kLower.includes('time')) {
+                } else if (kLower.includes('fecha') || kLower.includes('date') || kLower.includes('ano') || kLower.includes('año') || kLower.includes('mes') || kLower.includes('time') || kLower.includes('dia') || kLower.includes('día')) {
                     date.push(key);
-                } else if (typeof sampleVal === 'number' || (!isNaN(parseFloat(sampleVal)) && isFinite(sampleVal))) {
+                } else if (isNumCount / sampleCount >= 0.5) {
                     numeric.push(key);
                 } else {
                     cat.push(key);
@@ -529,7 +545,7 @@
             return { numeric, date, geo, cat };
         }
 
-        // GENERADOR DINÁMICO DE CATÁLOGO SEGÚN LAS COLUMNAS REALES DE LA PLANILLA SUBIDA
+        // GENERADOR DINÁMICO DE CATÁLOGO SEGÚN LAS COLUMNAS REALES
         function buildDynamicCatalog(dataset) {
             const cls = classifyColumns(dataset);
             
@@ -542,31 +558,31 @@
 
             CATALOG = {
                 'tab-bar': [
-                    { key: 'stacked_column', title: `📊 Comparativa de ${mainNum} por ${mainCat}`, icon: '📊', x: mainCat, y: mainNum, legend: secCat !== mainCat ? secCat : null, desc: `💡 **Qué informa este gráfico:** Compara los volúmenes acumulados de **${mainNum}** desglosados entre las categorías de **${mainCat}**.` },
-                    { key: 'clustered_bar', title: `📶 Clasificación Horizontal de ${secNum} por ${mainCat}`, icon: '📶', x: mainCat, y: secNum, legend: null, desc: `💡 **Qué informa este gráfico:** Visualización horizontal clara para comparar los importes de **${secNum}**.` }
+                    { key: 'stacked_column', title: `📊 Comparativa de ${mainNum} por ${mainCat}`, icon: '📊', x: mainCat, y: mainNum, legend: secCat !== mainCat ? secCat : null, desc: `💡 <strong>Qué informa este gráfico:</strong> Compara los volúmenes acumulados de <strong>${mainNum}</strong> desglosados entre las categorías de <strong>${mainCat}</strong>.` },
+                    { key: 'clustered_bar', title: `📶 Clasificación Horizontal de ${secNum} por ${mainCat}`, icon: '📶', x: mainCat, y: secNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Visualización horizontal clara para comparar los importes de <strong>${secNum}</strong>.` }
                 ],
                 'tab-trend': [
-                    { key: 'line_chart', title: `📈 Evolución Temporal de ${mainNum} por ${mainDate}`, icon: '📈', x: mainDate, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Muestra la tendencia continua de **${mainNum}** a lo largo de **${mainDate}**.` },
-                    { key: 'area_chart', title: `📉 Volumen Acumulado de ${secNum} en el Tiempo`, icon: '📉', x: mainDate, y: secNum, legend: null, desc: `💡 **Qué informa este gráfico:** Representa el área acumulada de **${secNum}** en la secuencia temporal.` }
+                    { key: 'line_chart', title: `📈 Evolución Temporal de ${mainNum} por ${mainDate}`, icon: '📈', x: mainDate, y: mainNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Muestra la tendencia continua de <strong>${mainNum}</strong> a lo largo de <strong>${mainDate}</strong>.` },
+                    { key: 'area_chart', title: `📉 Volumen Acumulado de ${secNum} en el Tiempo`, icon: '📉', x: mainDate, y: secNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Representa el área acumulada de <strong>${secNum}</strong> en la secuencia temporal.` }
                 ],
                 'tab-kpi': [
-                    { key: 'single_card', title: `🔢 Indicador Clave (KPI): Total ${mainNum}`, icon: '🔢', x: mainNum, y: mainNum, legend: null, desc: `💡 **Qué informa este indicador:** Cifra monumental consolidada de **${mainNum}** para la evaluación ejecutiva.` }
+                    { key: 'single_card', title: `🔢 Indicador Clave (KPI): Total ${mainNum}`, icon: '🔢', x: mainNum, y: mainNum, legend: null, desc: `💡 <strong>Qué informa este indicador:</strong> Cifra monumental consolidada de <strong>${mainNum}</strong> para la evaluación ejecutiva.` }
                 ],
                 'tab-matrix': [
-                    { key: 'matrix', title: `🔢 Matriz Desplegable: ${mainNum} por ${mainCat} y ${secCat}`, icon: '🔢', x: mainCat, y: mainNum, legend: secCat, desc: `💡 **Qué informa este gráfico:** Recrea una tabla dinámica interactiva con jerarquía de filas y columnas.` }
+                    { key: 'matrix', title: `🔢 Matriz Desplegable: ${mainNum} por ${mainCat} y ${secCat}`, icon: '🔢', x: mainCat, y: mainNum, legend: secCat, desc: `💡 <strong>Qué informa este gráfico:</strong> Recrea una tabla dinámica interactiva con jerarquía de filas y columnas.` }
                 ],
                 'tab-pie': [
-                    { key: 'donut', title: `🍩 Participación Porcentual de ${mainNum} por ${mainCat}`, icon: '🍩', x: mainCat, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Proporción porcentual del total de **${mainNum}** atribuible a **${mainCat}**.` },
-                    { key: 'treemap', title: `🟩 Mapa de Árbol de ${secNum} por ${mainCat}`, icon: '🟩', x: mainCat, y: secNum, legend: null, desc: `💡 **Qué informa este gráfico:** Rectángulos proporcionales según el tamaño numérico de **${secNum}**.` }
+                    { key: 'donut', title: `🍩 Participación Porcentual de ${mainNum} por ${mainCat}`, icon: '🍩', x: mainCat, y: mainNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Proporción porcentual del total de <strong>${mainNum}</strong> atribuible a <strong>${mainCat}</strong>.` },
+                    { key: 'treemap', title: `🟩 Mapa de Árbol de ${secNum} por ${mainCat}`, icon: '🟩', x: mainCat, y: secNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Rectángulos proporcionales según el tamaño numérico de <strong>${secNum}</strong>.` }
                 ],
                 'tab-map': [
-                    { key: 'bubble_map', title: `🌍 Distribución Geográfica de ${mainNum} por ${mainGeo}`, icon: '🌍', x: mainGeo, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Sitúa sobre el globo terrestre la magnitud de **${mainNum}** en cada **${mainGeo}**.` }
+                    { key: 'bubble_map', title: `🌍 Distribución Geográfica de ${mainNum} por ${mainGeo}`, icon: '🌍', x: mainGeo, y: mainNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Sitúa sobre el globo terrestre la magnitud de <strong>${mainNum}</strong> en cada <strong>${mainGeo}</strong>.` }
                 ],
                 'tab-advanced': [
-                    { key: 'waterfall', title: `📉 Análisis de Variación Cascada de ${mainNum} por ${mainCat}`, icon: '📉', x: mainCat, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Desglosa los aumentos y reducciones que experimenta **${mainNum}**.` }
+                    { key: 'waterfall', title: `📉 Análisis de Variación Cascada de ${mainNum} por ${mainCat}`, icon: '📉', x: mainCat, y: mainNum, legend: null, desc: `💡 <strong>Qué informa este gráfico:</strong> Desglosa los aumentos y reducciones que experimenta <strong>${mainNum}</strong>.` }
                 ],
                 'tab-slicer': [
-                    { key: 'slicer', title: `🔍 Filtro Segmentador por ${mainCat}`, icon: '🔍', x: mainCat, y: mainNum, legend: null, desc: `💡 **Qué informa este componente:** Permite filtrar e interactuar dinámicamente con el reporte.` }
+                    { key: 'slicer', title: `🔍 Filtro Segmentador por ${mainCat}`, icon: '🔍', x: mainCat, y: mainNum, legend: null, desc: `💡 <strong>Qué informa este componente:</strong> Permite filtrar e interactuar dinámicamente con el reporte.` }
                 ]
             };
         }
@@ -609,10 +625,18 @@
         }
 
         function renderPlotlyChart(divId, item) {
-            let xRaw = activeDataset.map(d => d[item.x] !== undefined ? d[item.x] : 'Sin Registro');
+            let xRaw = activeDataset.map(d => {
+                let v = d[item.x];
+                return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v) : 'Sin Registro';
+            });
+
             let yRaw = activeDataset.map(d => {
-                let v = parseFloat(d[item.y]);
-                return isNaN(v) ? 0 : v;
+                let val = d[item.y];
+                if (typeof val === 'number') return val;
+                if (!val) return 0;
+                let strClean = String(val).replace(/[$€£\s]/g, '').replace(',', '.');
+                let parsed = parseFloat(strClean);
+                return isNaN(parsed) ? 0 : parsed;
             });
 
             // Agrupar datos por la categoría X
