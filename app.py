@@ -4,11 +4,19 @@ import numpy as np
 import os
 import streamlit.components.v1 as components
 
-from modules.data_loader import load_data, classify_columns, get_data_summary
-from modules.powerbi_formatter import POWERBI_VISUAL_CATALOG, generate_powerbi_guide
-from modules.chart_builder import build_plotly_chart
-from modules.visual_generator import generate_all_possible_visuals
-from modules.html_exporter import generate_html_report
+# Fallback de importación dual (compatible con estructura de carpetas /modules y archivos sueltos en raíz de GitHub)
+try:
+    from modules.data_loader import load_data, classify_columns, get_data_summary
+    from modules.powerbi_formatter import POWERBI_VISUAL_CATALOG, generate_powerbi_guide
+    from modules.chart_builder import build_plotly_chart
+    from modules.visual_generator import generate_all_possible_visuals
+    from modules.html_exporter import generate_html_report
+except (ModuleNotFoundError, ImportError):
+    from data_loader import load_data, classify_columns, get_data_summary
+    from powerbi_formatter import POWERBI_VISUAL_CATALOG, generate_powerbi_guide
+    from chart_builder import build_plotly_chart
+    from visual_generator import generate_all_possible_visuals
+    from html_exporter import generate_html_report
 
 # Configuración de página de Streamlit
 st.set_page_config(
@@ -286,7 +294,12 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # Datasets de muestra integrados
 BASE_DIR = os.path.dirname(__file__)
 SAMPLE_EXCEL = os.path.join(BASE_DIR, "sample_data", "sample_ventas_finanzas.xlsx")
+if not os.path.exists(SAMPLE_EXCEL):
+    SAMPLE_EXCEL = os.path.join(BASE_DIR, "sample_ventas_finanzas.xlsx")
+
 SAMPLE_CSV = os.path.join(BASE_DIR, "sample_data", "sample_rrhh_desempeno.csv")
+if not os.path.exists(SAMPLE_CSV):
+    SAMPLE_CSV = os.path.join(BASE_DIR, "sample_rrhh_desempeno.csv")
 
 # ---------------------------------------------------------
 # POP-UP MODAL (DIALOG) PARA MOSTRAR LA GUÍA POWER BI CON CASOS DE EJEMPLO
@@ -580,7 +593,7 @@ with active_tabs[len(gallery_categories)]:
 # =========================================================
 # PESTAÑA: MANUAL EJECUTIVO COMPLETO
 # =========================================================
-with active_tabs[len(gallery_categories) + 1]:
+with active_tabs[len(gallery_categories)]:
     st.subheader("📑 Manual Ejecutivo Completo para Power BI")
     st.caption("Descarga la guía entera en formato HTML/PDF para consultar todos los componentes de una sola vez.")
     
@@ -602,7 +615,7 @@ with active_tabs[len(gallery_categories) + 1]:
 # =========================================================
 # PESTAÑA: MODELO & PROCEDENCIA DE LOS DATOS
 # =========================================================
-with active_tabs[len(gallery_categories) + 2]:
+with active_tabs[len(gallery_categories) + 1]:
     st.subheader("🔍 Modelo de Datos y Procedencia de Planillas")
     st.caption("Inspecciona la lista de planillas cargadas, relaciones detectadas y origen exacto de cada columna.")
     
