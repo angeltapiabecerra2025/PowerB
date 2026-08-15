@@ -492,47 +492,96 @@
         let activeDataset = SAMPLE_VENTAS;
         let activeTab = 'tab-bar';
         let activeSourceNames = ['sample_ventas_finanzas.xlsx'];
+        let CATALOG = {};
 
-        // CATEGORÍAS DE GRÁFICOS
-        const CATALOG = {
-            'tab-bar': [
-                { key: 'stacked_column', title: '📊 Comparativa de Ventas_Globales por Region', icon: '📊', x: 'Region', y: 'Ventas_Globales', legend: 'Plataforma', desc: '💡 **Qué informa este gráfico:** Compara el volumen acumulado de Ventas_Globales desglosado por Region y Plataforma.' },
-                { key: 'clustered_bar', title: '📶 Clasificación Horizontal de Unidades_Vendidas por Region', icon: '📶', x: 'Region', y: 'Unidades_Vendidas', legend: null, desc: '💡 **Qué informa este gráfico:** Visualización horizontal clara para comparar volúmenes de Unidades_Vendidas.' }
-            ],
-            'tab-trend': [
-                { key: 'line_chart', title: '📈 Evolución Temporal de Ventas_Globales por Fecha', icon: '📈', x: 'Fecha', y: 'Ventas_Globales', legend: null, desc: '💡 **Qué informa este gráfico:** Muestra la tendencia continua de Ventas_Globales a lo largo del tiempo.' },
-                { key: 'area_chart', title: '📉 Volumen Acumulado de Costo_Operativo en el Tiempo', icon: '📉', x: 'Fecha', y: 'Costo_Operativo', legend: null, desc: '💡 **Qué informa este gráfico:** Representa el área sombreada acumulada de Costo_Operativo.' }
-            ],
-            'tab-kpi': [
-                { key: 'single_card', title: '🔢 Indicador Clave (KPI): Total Ventas_Globales', icon: '🔢', x: 'Ventas_Globales', y: 'Ventas_Globales', legend: null, desc: '💡 **Qué informa este indicador:** Cifra monumental consolidada de Ventas_Globales para tableros ejecutivos.' }
-            ],
-            'tab-matrix': [
-                { key: 'matrix', title: '🔢 Matriz Desplegable: Ventas_Globales por Region y Plataforma', icon: '🔢', x: 'Region', y: 'Ventas_Globales', legend: 'Plataforma', desc: '💡 **Qué informa este gráfico:** Recrea una tabla dinámica interactiva con filas y columnas.' }
-            ],
-            'tab-pie': [
-                { key: 'donut', title: '🍩 Participación Porcentual de Ventas_Globales por Plataforma', icon: '🍩', x: 'Plataforma', y: 'Ventas_Globales', legend: null, desc: '💡 **Qué informa este gráfico:** Proporción porcentual del total de Ventas_Globales atribuible a cada Plataforma.' },
-                { key: 'treemap', title: '🟩 Mapa de Árbol de Unidades_Vendidas por Region', icon: '🟩', x: 'Region', y: 'Unidades_Vendidas', legend: null, desc: '💡 **Qué informa este gráfico:** Rectángulos proporcionales según el tamaño de Unidades_Vendidas.' }
-            ],
-            'tab-map': [
-                { key: 'bubble_map', title: '🌍 Distribución Geográfica de Ventas_Globales por Pais', icon: '🌍', x: 'Pais', y: 'Ventas_Globales', legend: null, desc: '💡 **Qué informa este gráfico:** Sitúa en un mapa geográfico interactivo sobre el globo terrestre la magnitud de Ventas_Globales en cada Pais.' }
-            ],
-            'tab-advanced': [
-                { key: 'waterfall', title: '📉 Análisis de Variación Cascada de Ventas_Globales por Region', icon: '📉', x: 'Region', y: 'Ventas_Globales', legend: null, desc: '💡 **Qué informa este gráfico:** Desglosa los incrementos y totales acumulados de Ventas_Globales.' }
-            ],
-            'tab-slicer': [
-                { key: 'slicer', title: '🔍 Filtro Segmentador por Region', icon: '🔍', x: 'Region', y: 'Ventas_Globales', legend: null, desc: '💡 **Qué informa este componente:** Permite segmentar e interactuar con todo el reporte.' }
-            ]
-        };
+        // CLASIFICACIÓN DINÁMICA DE COLUMNAS DE CUALQUIER PLANILLA SUBIDA
+        function classifyColumns(dataset) {
+            if (!dataset || !dataset.length) return { numeric: [], date: [], geo: [], cat: [] };
+            
+            const firstRow = dataset[0];
+            const keys = Object.keys(firstRow);
+
+            let numeric = [];
+            let date = [];
+            let geo = [];
+            let cat = [];
+
+            keys.forEach(key => {
+                const kLower = String(key).toLowerCase();
+                const sampleVal = firstRow[key];
+
+                if (kLower.includes('pais') || kLower.includes('país') || kLower.includes('country') || kLower.includes('region') || kLower.includes('región') || kLower.includes('ciudad') || kLower.includes('city') || kLower.includes('state') || kLower.includes('estado') || kLower.includes('zona')) {
+                    geo.push(key);
+                } else if (kLower.includes('fecha') || kLower.includes('date') || kLower.includes('ano') || kLower.includes('año') || kLower.includes('mes') || kLower.includes('time')) {
+                    date.push(key);
+                } else if (typeof sampleVal === 'number' || (!isNaN(parseFloat(sampleVal)) && isFinite(sampleVal))) {
+                    numeric.push(key);
+                } else {
+                    cat.push(key);
+                }
+            });
+
+            if (!numeric.length) numeric = keys.length ? [keys[0]] : ['Valor'];
+            if (!cat.length) cat = keys.length ? [keys[0]] : ['Categoria'];
+            if (!date.length) date = cat;
+            if (!geo.length) geo = cat;
+
+            return { numeric, date, geo, cat };
+        }
+
+        // GENERADOR DINÁMICO DE CATÁLOGO SEGÚN LAS COLUMNAS REALES DE LA PLANILLA SUBIDA
+        function buildDynamicCatalog(dataset) {
+            const cls = classifyColumns(dataset);
+            
+            const mainNum = cls.numeric[0];
+            const secNum = cls.numeric[1] || mainNum;
+            const mainCat = cls.cat[0];
+            const secCat = cls.cat[1] || mainCat;
+            const mainDate = cls.date[0];
+            const mainGeo = cls.geo[0];
+
+            CATALOG = {
+                'tab-bar': [
+                    { key: 'stacked_column', title: `📊 Comparativa de ${mainNum} por ${mainCat}`, icon: '📊', x: mainCat, y: mainNum, legend: secCat !== mainCat ? secCat : null, desc: `💡 **Qué informa este gráfico:** Compara los volúmenes acumulados de **${mainNum}** desglosados entre las categorías de **${mainCat}**.` },
+                    { key: 'clustered_bar', title: `📶 Clasificación Horizontal de ${secNum} por ${mainCat}`, icon: '📶', x: mainCat, y: secNum, legend: null, desc: `💡 **Qué informa este gráfico:** Visualización horizontal clara para comparar los importes de **${secNum}**.` }
+                ],
+                'tab-trend': [
+                    { key: 'line_chart', title: `📈 Evolución Temporal de ${mainNum} por ${mainDate}`, icon: '📈', x: mainDate, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Muestra la tendencia continua de **${mainNum}** a lo largo de **${mainDate}**.` },
+                    { key: 'area_chart', title: `📉 Volumen Acumulado de ${secNum} en el Tiempo`, icon: '📉', x: mainDate, y: secNum, legend: null, desc: `💡 **Qué informa este gráfico:** Representa el área acumulada de **${secNum}** en la secuencia temporal.` }
+                ],
+                'tab-kpi': [
+                    { key: 'single_card', title: `🔢 Indicador Clave (KPI): Total ${mainNum}`, icon: '🔢', x: mainNum, y: mainNum, legend: null, desc: `💡 **Qué informa este indicador:** Cifra monumental consolidada de **${mainNum}** para la evaluación ejecutiva.` }
+                ],
+                'tab-matrix': [
+                    { key: 'matrix', title: `🔢 Matriz Desplegable: ${mainNum} por ${mainCat} y ${secCat}`, icon: '🔢', x: mainCat, y: mainNum, legend: secCat, desc: `💡 **Qué informa este gráfico:** Recrea una tabla dinámica interactiva con jerarquía de filas y columnas.` }
+                ],
+                'tab-pie': [
+                    { key: 'donut', title: `🍩 Participación Porcentual de ${mainNum} por ${mainCat}`, icon: '🍩', x: mainCat, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Proporción porcentual del total de **${mainNum}** atribuible a **${mainCat}**.` },
+                    { key: 'treemap', title: `🟩 Mapa de Árbol de ${secNum} por ${mainCat}`, icon: '🟩', x: mainCat, y: secNum, legend: null, desc: `💡 **Qué informa este gráfico:** Rectángulos proporcionales según el tamaño numérico de **${secNum}**.` }
+                ],
+                'tab-map': [
+                    { key: 'bubble_map', title: `🌍 Distribución Geográfica de ${mainNum} por ${mainGeo}`, icon: '🌍', x: mainGeo, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Sitúa sobre el globo terrestre la magnitud de **${mainNum}** en cada **${mainGeo}**.` }
+                ],
+                'tab-advanced': [
+                    { key: 'waterfall', title: `📉 Análisis de Variación Cascada de ${mainNum} por ${mainCat}`, icon: '📉', x: mainCat, y: mainNum, legend: null, desc: `💡 **Qué informa este gráfico:** Desglosa los aumentos y reducciones que experimenta **${mainNum}**.` }
+                ],
+                'tab-slicer': [
+                    { key: 'slicer', title: `🔍 Filtro Segmentador por ${mainCat}`, icon: '🔍', x: mainCat, y: mainNum, legend: null, desc: `💡 **Qué informa este componente:** Permite filtrar e interactuar dinámicamente con el reporte.` }
+                ]
+            };
+        }
 
         // INICIALIZACIÓN
         window.onload = function() {
+            buildDynamicCatalog(activeDataset);
+            updateModelSummary();
             renderGallery();
         };
 
         function switchTab(tabId) {
             activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            if (event && event.target) event.target.classList.add('active');
             renderGallery();
         }
 
@@ -560,8 +609,21 @@
         }
 
         function renderPlotlyChart(divId, item) {
-            let xData = activeDataset.map(d => d[item.x]);
-            let yData = activeDataset.map(d => d[item.y] || 0);
+            let xRaw = activeDataset.map(d => d[item.x] !== undefined ? d[item.x] : 'Sin Registro');
+            let yRaw = activeDataset.map(d => {
+                let v = parseFloat(d[item.y]);
+                return isNaN(v) ? 0 : v;
+            });
+
+            // Agrupar datos por la categoría X
+            let grouped = {};
+            xRaw.forEach((catVal, i) => {
+                if (!grouped[catVal]) grouped[catVal] = 0;
+                grouped[catVal] += yRaw[i];
+            });
+
+            let xData = Object.keys(grouped);
+            let yData = Object.values(grouped);
 
             let trace = {};
 
@@ -571,7 +633,7 @@
                     locationmode: 'country names',
                     locations: xData,
                     marker: {
-                        size: yData.map(v => Math.max(v / 800, 10)),
+                        size: yData.map(v => Math.max(Math.min(v / 500, 40), 12)),
                         color: '#0284C7'
                     }
                 };
@@ -589,7 +651,7 @@
                     values: yData,
                     type: 'pie',
                     hole: 0.4,
-                    marker: { colors: ['#0284C7', '#38BDF8', '#0369A1', '#075985', '#0284C7'] }
+                    marker: { colors: ['#0284C7', '#38BDF8', '#0369A1', '#075985', '#0284C7', '#0EA5E9'] }
                 };
             } else if (item.key === 'clustered_bar') {
                 trace = {
@@ -642,7 +704,6 @@
 
             let combinedData = [];
             let fileNames = [];
-
             let loadedCount = 0;
 
             for (let i = 0; i < files.length; i++) {
@@ -662,6 +723,7 @@
                     if (loadedCount === files.length) {
                         activeDataset = combinedData.slice(0, 1000);
                         activeSourceNames = fileNames;
+                        buildDynamicCatalog(activeDataset);
                         updateModelSummary();
                         renderGallery();
                     }
@@ -674,14 +736,19 @@
         function loadSampleDataset(type) {
             activeDataset = SAMPLE_VENTAS;
             activeSourceNames = ['sample_ventas_finanzas.xlsx'];
+            buildDynamicCatalog(activeDataset);
             updateModelSummary();
             renderGallery();
         }
 
         function updateModelSummary() {
+            const cls = classifyColumns(activeDataset);
             document.getElementById('header-subtitle').innerHTML = `Planillas activas: <strong>${activeSourceNames.join(', ')}</strong> (${activeDataset.length} filas muestreadas) | Visualiza combinaciones con reseña de datos reales y mapas.`;
             document.getElementById('source-count-badge').innerText = `📂 ${activeSourceNames.length} Planilla(s) Activa(s)`;
             document.getElementById('total-rows-val').innerText = activeDataset.length.toLocaleString();
+            document.getElementById('numeric-cols-val').innerText = cls.numeric.length;
+            document.getElementById('cat-cols-val').innerText = cls.cat.length;
+            document.getElementById('geo-cols-val').innerText = cls.geo.length;
         }
 
         // MODAL POWER BI RECIPE & DATA INTERPRETATION
@@ -690,16 +757,16 @@
             document.getElementById('modal-category').innerText = `Componente Power BI: ${item.key} | Categoría: ${activeTab}`;
             document.getElementById('modal-description').innerHTML = item.desc;
 
-            // Calcular casos de ejemplo reales
+            // Calcular casos de ejemplo reales con los datos dinámicos
             let topRecord = activeDataset[0] || {};
-            let val = topRecord[item.y] || 0;
+            let val = parseFloat(topRecord[item.y]) || 0;
             let catVal = topRecord[item.x] || 'Registro 1';
 
             document.getElementById('modal-case-study').innerHTML = `
                 <div class="case-box">
                     <strong>📌 Reseña e Interpretación con Datos Reales:</strong><br>
-                    En el registro destacado <strong>'${catVal}'</strong>, la métrica <strong>'${item.y}'</strong> alcanza un valor real de <strong>${Number(val).toLocaleString()}</strong>.
-                    <br>🎯 <em>Recomendación Power BI:</em> Se sugiere aplicar Formato Condicional de Color en Power BI Desktop para destacar automáticamente los registros principales.
+                    En el registro destacado <strong>'${catVal}'</strong> de tu planilla subida, la columna <strong>'${item.y}'</strong> registra un valor real de <strong>${Number(val).toLocaleString()}</strong>.
+                    <br>🎯 <em>Recomendación Power BI:</em> En Power BI Desktop se sugiere aplicar Formato Condicional de Color para resaltar automáticamente este caso destacado sobre los demás registros.
                 </div>
             `;
 
@@ -719,7 +786,7 @@
             document.getElementById('modal-dax-code').innerText = `Total_${item.y} = SUM('${activeSourceNames[0].split('.')[0]}'['${item.y}'])`;
             
             document.getElementById('modal-steps-list').innerHTML = `
-                <li>1. Abre <strong>Power BI Desktop</strong> y carga el archivo <code>${activeSourceNames[0]}</code>.</li>
+                <li>1. Abre <strong>Power BI Desktop</strong> y carga tu archivo <code>${activeSourceNames[0]}</code>.</li>
                 <li>2. En el panel de Visualizaciones, selecciona el objeto visual <strong>'${item.key}'</strong>.</li>
                 <li>3. Arrastra la columna <code>${item.x}</code> al contenedor <strong>Eje X / Categoría</strong>.</li>
                 <li>4. Arrastra la columna <code>${item.y}</code> al contenedor <strong>Eje Y / Valores</strong>.</li>
