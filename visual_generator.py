@@ -28,8 +28,8 @@ def build_executive_title_and_context(x_col, y_col, legend_col=None, visual_key=
         domain = "Estructura de Costos y Control Presupuestario"
     elif any(k in y_clean for k in ['salario', 'sueldo', 'renta', 'desempeno', 'desempeño', 'score', 'evaluacion', 'evaluación', 'rrhh', 'personal']):
         domain = "Gestión de Talento Humano y Desempeño"
-    elif any(k in y_clean for k in ['poblacion', 'población', 'habitantes', 'natalidad', 'personas', 'demografia']):
-        domain = "Análisis Demográfico y Poblacional"
+    elif any(k in y_clean for k in ['poblacion', 'población', 'habitantes', 'natalidad', 'personas', 'demografia', 'infant', 'mortality', 'expectancy', 'life', 'muertes']):
+        domain = "Análisis de Salud Pública, Demografía y Vida"
     elif any(k in y_clean for k in ['unidades', 'cantidad', 'stock', 'inventario', 'pedidos', 'ordenes']):
         domain = "Volumen Operativo y Capacidad Logística"
     elif any(k in y_clean for k in ['margen', 'tasa', 'porcentaje', 'pct', '%', 'csat', 'retencion']):
@@ -40,8 +40,8 @@ def build_executive_title_and_context(x_col, y_col, legend_col=None, visual_key=
         exec_title = f"🌍 Distribución Geográfica de {y_col} por {x_col}"
         info_text = f"💡 **Qué informa este gráfico:** Sitúa en un mapa geográfico la magnitud acumulada de **{y_col}** en cada **{x_col}**. Permite visualizar los centros de mayor concentración territorial en el contexto de {domain.lower()}."
     elif visual_key in ["line_chart", "area_chart"]:
-        exec_title = f"📈 Tendencia Histórica de {y_col} a través del Tiempo ({x_col})"
-        info_text = f"💡 **Qué informa este gráfico:** Muestra la trayectoria y comportamiento de **{y_col}** a lo largo de **{x_col}**, permitiendo detectar picos de temporada, patrones de crecimiento y variaciones en el contexto de {domain.lower()}."
+        exec_title = f"📈 Tendencia Histórica y Desglose de {y_col} por {x_col}"
+        info_text = f"💡 **Qué informa este gráfico:** Muestra el comportamiento y variación de **{y_col}** a lo largo de **{x_col}**, permitiendo detectar patrones de variación y picos en el contexto de {domain.lower()}."
     elif visual_key in ["donut", "pie", "treemap"]:
         exec_title = f"🍩 Proporción y Peso Relativo de {y_col} por {x_col}"
         info_text = f"💡 **Qué informa este gráfico:** Representa la participación porcentual de cada **{x_col}** sobre el total de **{y_col}**, destacando los componentes líderes en {domain.lower()}."
@@ -58,25 +58,29 @@ def build_executive_title_and_context(x_col, y_col, legend_col=None, visual_key=
         exec_title = f"📊 Comparativa de {y_col} por {x_col}"
         info_text = f"💡 **Qué informa este gráfico:** Compara los volúmenes totales de **{y_col}** desglosados entre las categorías de **{x_col}**, ofreciendo una visión clara de rendimiento para {domain.lower()}."
 
-    if src_y and src_y != src_x:
+    if src_y and src_x and src_y != src_x and not str(src_x).startswith('_'):
         info_text += f" *(Datos entrelazados desde '{src_y}' y '{src_x}')*"
 
     return exec_title, info_text
 
 def generate_all_possible_visuals(df, provenance_map=None, relationships=None):
     """
-    Genera el catálogo exhaustivo y masivo de gráficos y tablas aplicables agrupados por categoría.
+    Genera el catálogo exhaustivo y masivo de gráficos y tablas aplicables agrupados por categoría,
+    filtrando estrictamente cualquier columna de metadatos del sistema (_Origen_Archivo).
     """
     provenance_map = provenance_map or {}
     relationships = relationships or []
     
     classification = classify_columns(df)
     
-    numerics = classification['numeric']
-    dates = classification['datetime']
-    categoricals = classification['categorical']
-    geographics = classification['geographic']
-    percentages = classification['percentage']
+    # Filtrar columnas internas
+    numerics = [c for c in classification['numeric'] if not str(c).startswith('_')]
+    dates = [c for c in classification['datetime'] if not str(c).startswith('_')]
+    categoricals = [c for c in classification['categorical'] if not str(c).startswith('_')]
+    geographics = [c for c in classification['geographic'] if not str(c).startswith('_')]
+    percentages = [c for c in classification['percentage'] if not str(c).startswith('_')]
+    
+    clean_cols = [c for c in df.columns if not str(c).startswith('_')]
     
     all_visuals = {
         "📊 Columnas y Barras": [],
@@ -89,10 +93,10 @@ def generate_all_possible_visuals(df, provenance_map=None, relationships=None):
         "🔍 Filtros e Interactividad": []
     }
     
-    main_num = numerics[0] if numerics else (df.columns[0] if len(df.columns) > 0 else "Valor")
+    main_num = numerics[0] if numerics else (clean_cols[0] if clean_cols else "Valor")
     num_list = numerics[:4] if numerics else [main_num]
-    cat_list = (geographics + categoricals)[:4] if (geographics + categoricals) else [df.columns[0]]
-    date_list = dates[:2] if dates else (categoricals[:1] if categoricals else [cat_list[0]])
+    cat_list = (geographics + categoricals)[:4] if (geographics + categoricals) else (clean_cols[:1] if clean_cols else ["Categoria"])
+    date_list = dates[:2] if dates else (cat_list[:2] if cat_list else ["Registro"])
     
     def make_guide(v_key, x, y, legend=None, sec_y=None, agg="SUM"):
         return generate_powerbi_guide(
@@ -146,13 +150,14 @@ def generate_all_possible_visuals(df, provenance_map=None, relationships=None):
     # 2. 📈 Tendencias y Tiempo
     for d_col in date_list:
         for num_col in num_list[:2]:
-            exec_t_line, ctx_line = build_executive_title_and_context(d_col, num_col, None, "line_chart", "SUM", provenance_map)
-            guide_line = make_guide("line_chart", d_col, num_col, legend=cat_list[0] if cat_list[0] != d_col else None)
+            leg_val = cat_list[0] if (cat_list and cat_list[0] != d_col) else None
+            exec_t_line, ctx_line = build_executive_title_and_context(d_col, num_col, leg_val, "line_chart", "SUM", provenance_map)
+            guide_line = make_guide("line_chart", d_col, num_col, legend=leg_val)
             all_visuals["📈 Tendencias y Tiempo"].append({
                 "key": "line_chart",
                 "title": exec_t_line,
                 "icon": "📈",
-                "x_col": d_col, "y_col": num_col, "legend_col": cat_list[0] if cat_list[0] != d_col else None, "secondary_y": None,
+                "x_col": d_col, "y_col": num_col, "legend_col": leg_val, "secondary_y": None,
                 "agg_func": "SUM", "guide": guide_line,
                 "description": ctx_line
             })
@@ -241,7 +246,7 @@ def generate_all_possible_visuals(df, provenance_map=None, relationships=None):
         })
 
     # 6. 🗺️ Mapas y Geografía
-    geo_cols = geographics if geographics else [c for c in categoricals if any(k in c.lower() for k in ['region', 'región', 'pais', 'país', 'ciudad', 'zona', 'comuna', 'country', 'city'])]
+    geo_cols = geographics if geographics else [c for c in categoricals if any(k in str(c).lower() for k in ['region', 'región', 'pais', 'país', 'ciudad', 'zona', 'comuna', 'country', 'city'])]
     if geo_cols:
         for g_col in geo_cols:
             exec_t_map, ctx_map = build_executive_title_and_context(g_col, main_num, None, "bubble_map", "SUM", provenance_map)

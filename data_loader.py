@@ -99,7 +99,7 @@ def load_data(uploaded_files, max_rows=1000):
 
     # Limpieza de tipos de datos
     for col in master_df.columns:
-        if col == '_Origen_Archivo':
+        if str(col).startswith('_'):
             continue
         series = master_df[col]
         if series.dtype == 'object':
@@ -127,11 +127,11 @@ def auto_merge_and_detect_relationships(dfs, provenance_map):
         next_df = dfs[i].copy()
         
         common_cols = list(set(base_df.columns).intersection(set(next_df.columns)))
-        common_cols = [c for c in common_cols if c != '_Origen_Archivo']
+        common_cols = [c for c in common_cols if not str(c).startswith('_')]
         
         join_key = None
         for col in common_cols:
-            if any(k in col.lower() for k in ['id', 'codigo', 'código', 'code', 'key', 'region', 'región', 'pais', 'país', 'fecha', 'date']):
+            if any(k in col.lower() for k in ['id', 'codigo', 'código', 'code', 'key', 'region', 'región', 'pais', 'país', 'country', 'fecha', 'date']):
                 join_key = col
                 break
                 
@@ -177,7 +177,8 @@ def get_inmemory_fallback_data(max_rows=1000):
 
 def classify_columns(df):
     """
-    Clasifica las columnas de un DataFrame en Numéricas, Fechas, Categorías y Geográficas.
+    Clasifica las columnas de un DataFrame en Numéricas, Fechas, Categorías y Geográficas,
+    excluyendo explícitamente columnas internas de metadata (_Origen_Archivo).
     """
     classification = {
         'numeric': [],
@@ -190,7 +191,7 @@ def classify_columns(df):
     geo_keywords = ['region', 'región', 'pais', 'país', 'country', 'city', 'ciudad', 'state', 'estado', 'zona', 'comuna', 'ubicacion', 'ubicación']
     
     for col in df.columns:
-        if col == '_Origen_Archivo':
+        if str(col).startswith('_'):
             continue
             
         col_lower = str(col).lower()
@@ -227,7 +228,7 @@ def get_data_summary(df, total_original_records, provenance_map=None):
     
     col_details = []
     for col in df.columns:
-        if col == '_Origen_Archivo':
+        if str(col).startswith('_'):
             continue
         c_type = "Categoría"
         if col in classification['numeric']:
@@ -249,8 +250,10 @@ def get_data_summary(df, total_original_records, provenance_map=None):
         
     summary = {
         "total_rows": len(df),
+        "sample_rows": len(df),
         "total_original_records": total_original_records,
-        "total_cols": len(df.columns) - (1 if '_Origen_Archivo' in df.columns else 0),
+        "total_original_rows": total_original_records,
+        "total_cols": len(df.columns) - len([c for c in df.columns if str(c).startswith('_')]),
         "classification": classification,
         "column_details": col_details
     }
